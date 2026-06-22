@@ -38,11 +38,8 @@ int main() {
                 ssize_t bytes_read = recv(new_socket, buffer, sizeof(buffer), 0);
                 if (bytes_read > 0) {
                     std::cout << "Received from client " << new_socket << ": " << buffer << std::endl;
-                    // 键盘输入响应
-                    std::string response;
-                    std::cout << "Enter response to client " << new_socket << ": ";
-                    std::getline(std::cin, response);
-                    send(new_socket, response.c_str(), response.size(), 0);
+                    //echo
+                    send(new_socket, buffer, bytes_read, 0);
                 } else if (bytes_read == 0) {
                     std::cout << "Client " << new_socket << " disconnected." << std::endl;
                     close(new_socket);

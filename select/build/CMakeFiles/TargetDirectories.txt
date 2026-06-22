@@ -1,0 +1,4 @@
+/home/illogical/project/muduo/select/build/CMakeFiles/server.dir
+/home/illogical/project/muduo/select/build/CMakeFiles/client.dir
+/home/illogical/project/muduo/select/build/CMakeFiles/edit_cache.dir
+/home/illogical/project/muduo/select/build/CMakeFiles/rebuild_cache.dir

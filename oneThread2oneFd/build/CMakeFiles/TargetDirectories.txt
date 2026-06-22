@@ -1,0 +1,4 @@
+/home/illogical/project/muduo/oneThread2oneFd/build/CMakeFiles/server.dir
+/home/illogical/project/muduo/oneThread2oneFd/build/CMakeFiles/client.dir
+/home/illogical/project/muduo/oneThread2oneFd/build/CMakeFiles/edit_cache.dir
+/home/illogical/project/muduo/oneThread2oneFd/build/CMakeFiles/rebuild_cache.dir
