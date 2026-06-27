@@ -1,5 +1,3 @@
-// select-based server
-// 使用 I/O 多路复用 select() 单线程处理多个客户端连接
 #include <iostream>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -9,109 +7,116 @@
 #include <algorithm>
 #include <sys/select.h>
 
-int main() {
-    // 1. 创建监听 socket
-    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_fd < 0) {
-        std::cerr << "Failed to create socket" << std::endl;
+int main(){
+    //
+    int l_fd = socket(AF_INET,SOCK_STREAM,0);
+    if (l_fd < 0)
+    {
+        std::cerr << "fail to create socket" << std::endl;
         return -1;
     }
-
-    // 设置端口复用，避免 "Address already in use"
+    // 端口复用
+    // TCP连接 断开连接的一方会等待2MSL linux设定这个时间为60s
+    // 服务器因维护重启时，必须等待
     int opt = 1;
-    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    setsockopt(l_fd,SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    // 绑定地址
+    sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port  = htons(8080);
 
-    sockaddr_in address;
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(8080);
-
-    if (bind(server_fd, (sockaddr*)&address, sizeof(address)) < 0) {
-        std::cerr << "Bind failed" << std::endl;
-        close(server_fd);
+    if(bind(l_fd,(sockaddr*)&addr,sizeof(addr))<0){
+        std::cerr << "fail to bind" << std::endl;
+        close(l_fd);
         return -1;
     }
-
-    if (listen(server_fd, 5) < 0) {
-        std::cerr << "Listen failed" << std::endl;
-        close(server_fd);
+    // 监听
+    if(listen(l_fd,5)<0){
+        std::cerr << "fail to listen" << std::endl;
+        close(l_fd);
         return -1;
     }
-
     std::cout << "Server is listening on port 8080 (select model)" << std::endl;
-
-    // 2. 用 vector 保存所有已连接的客户端 fd
-    std::vector<int> client_fds;
-
-    int max_fd = server_fd;
-
-    while (true) {
-        // 3. 每次循环重新构造可读 fd_set
+    // 保存所有关注的通信套接字
+    std::vector<int> cfds;
+    // select函数第一个参数 关注的fd列表中最大的+1
+    int max_fd = l_fd;
+    while(1){
         fd_set read_fds;
+        // 清空
         FD_ZERO(&read_fds);
-        FD_SET(server_fd, &read_fds);
-
-        for (int fd : client_fds) {
-            FD_SET(fd, &read_fds);
+        // 关注通信套接字的读事件
+        FD_SET(l_fd,&read_fds);
+        for(int fd : cfds){
+            FD_SET(fd,&read_fds);
         }
-
-        // 4. 调用 select —— 阻塞等待任意 fd 可读
-        int activity = select(max_fd + 1, &read_fds, nullptr, nullptr, nullptr);
-        if (activity < 0) {
-            std::cerr << "select() error" << std::endl;
+        // 看看有无事件
+        // 无限等待，直到有事件发生
+        // 有数据->网卡中断->cpu设置DMA参数->DMA将数据搬运到内核缓冲区->完成后触发硬中断->cpu处理
+        // ->唤醒网络相关线程->数据处理->sock接收队列->唤醒阻塞在select的进程
+        int activity = select(max_fd+1,&read_fds,nullptr,nullptr,nullptr);
+        if(activity<0){
+            std::cerr << "select failed" << std::endl;
             break;
         }
-
-        // 5. 处理监听 fd 上的新连接
-        // 有新连接到来，accept 并加入 client_fds
-        if (FD_ISSET(server_fd, &read_fds)) {
+        // 看看有没有新到访的客人要登记
+        if(FD_ISSET(l_fd,&read_fds)){
             sockaddr_in client_addr;
             socklen_t addr_len = sizeof(client_addr);
-            int new_fd = accept(server_fd, (sockaddr*)&client_addr, &addr_len);
-            if (new_fd >= 0) {
-                std::cout << "New connection accepted, fd=" << new_fd << std::endl;
-                client_fds.push_back(new_fd);
-                if (new_fd > max_fd) {
+            int new_fd = accept(l_fd,(sockaddr*)&client_addr,&addr_len);
+            // if(new_fd<0){
+            //     std::cerr << "fail to accept new client" << std::endl;
+            //     break;
+            // }
+
+            // 建立新链接后
+            // 加入通信套接字数组
+            if(new_fd>=0){
+                cfds.push_back(new_fd);
+                // 更改参数
+                if(new_fd > max_fd){
                     max_fd = new_fd;
                 }
             }
-            // 如果只有新连接事件，继续下一轮 select
-            if (--activity == 0) continue;
+
+            // 如果只有这一个事件，直接跳过
+            if(--activity <= 0)continue;
         }
-
-        // 6. 遍历客户端 fd，处理已经就绪的读事件
-        for (auto it = client_fds.begin(); it != client_fds.end(); ) {
-            int fd = *it;
-            if (FD_ISSET(fd, &read_fds)) {
-                char buffer[1024] = {0};
-                ssize_t bytes_read = recv(fd, buffer, sizeof(buffer) - 1, 0);
-
-                if (bytes_read > 0) {
-                    // 收到数据，原样回显 (echo)
-                    buffer[bytes_read] = '\0';
-                    std::cout << "Received from fd=" << fd << ": " << buffer << std::endl;
-                    send(fd, buffer, bytes_read, 0);
+        // 遍历所有通信fd，看看有没有事件
+        for(auto it = cfds.begin();it != cfds.end();){
+            int c_fd = * it;
+            if(FD_ISSET(c_fd,&read_fds)){
+                // 接收信息
+                char buf[1024] = {0};
+                size_t bytes_read = recv(c_fd,buf,sizeof(buf)-1,0);
+                if(bytes_read > 0){
+                    // 以 0 作为结尾
+                    buf[bytes_read] = '0';
+                    send(c_fd,buf,sizeof(buf),0);
                     ++it;
-                } else {
-                    // bytes_read == 0 表示对方关闭；< 0 表示错误
-                    if (bytes_read == 0) {
-                        std::cout << "Client fd=" << fd << " disconnected" << std::endl;
-                    } else {
-                        std::cerr << "Error reading from fd=" << fd << std::endl;
-                    }
-                    close(fd);
-                    it = client_fds.erase(it);
                 }
-
-                if (--activity == 0) break;
-            } else {
+                else{
+                    // bytes_read == 0
+                    // 连接关闭
+                    if(bytes_read == 0){
+                        std::cout << "client fd=%d disconnected" << c_fd << std::endl;
+                    }
+                    else{
+                        std::cerr << "received from client fd = " << c_fd << "failed" <<std::endl;
+                    }
+                    close(c_fd);
+                    it = cfds.erase(it);   
+                }
+                if(--activity == 0)break;
+            }
+            else{
                 ++it;
             }
         }
     }
-
-    // 清理
-    for (int fd : client_fds) close(fd);
-    close(server_fd);
+    // 通信结束，关掉所有套接字
+    for(int c_fd : cfds)close(c_fd);
+    close(l_fd);
     return 0;
 }
