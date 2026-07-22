@@ -1,0 +1,21 @@
+file(REMOVE_RECURSE
+  "CMakeFiles/reactor.dir/Acceptor.cpp.o"
+  "CMakeFiles/reactor.dir/Acceptor.cpp.o.d"
+  "CMakeFiles/reactor.dir/Buffer.cpp.o"
+  "CMakeFiles/reactor.dir/Buffer.cpp.o.d"
+  "CMakeFiles/reactor.dir/Channel.cpp.o"
+  "CMakeFiles/reactor.dir/Channel.cpp.o.d"
+  "CMakeFiles/reactor.dir/EventLoop.cpp.o"
+  "CMakeFiles/reactor.dir/EventLoop.cpp.o.d"
+  "CMakeFiles/reactor.dir/Server.cpp.o"
+  "CMakeFiles/reactor.dir/Server.cpp.o.d"
+  "CMakeFiles/reactor.dir/TcpConnection.cpp.o"
+  "CMakeFiles/reactor.dir/TcpConnection.cpp.o.d"
+  "libreactor.a"
+  "libreactor.pdb"
+)
+
+# Per-language clean rules from dependency scanning.
+foreach(lang CXX)
+  include(CMakeFiles/reactor.dir/cmake_clean_${lang}.cmake OPTIONAL)
+endforeach()
