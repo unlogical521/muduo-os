@@ -16,7 +16,7 @@ class Channel;
 
 class Acceptor {
 public:
-    using NewConnectionCallback = std::function<void(int connfd, sockaddr_in& addr)>;
+    using NewConnectionCallback = std::function<void(int connfd, const sockaddr_in& addr)>;
 
     Acceptor(EventLoop* loop, int port);
     ~Acceptor();

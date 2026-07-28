@@ -8,6 +8,10 @@
 // 当 fd 可读时：从 fd 读到 inputBuffer_，调用 messageCallback_
 // 当 fd 可写时：将 outputBuffer_ 写出到 fd
 //
+// 线程安全：
+//   - send() 可在任意线程调用，跨线程时通过 runInLoop 调度
+//   - 所有 IO 操作（handleRead/handleWrite）只在其所属 EventLoop 线程上执行
+//
 #pragma once
 
 #include <functional>
@@ -19,13 +23,13 @@ class EventLoop;
 class Channel;
 class Buffer;
 
-class TcpConnection {
+class TcpConnection : public std::enable_shared_from_this<TcpConnection> {
 public:
     using MessageCallback = std::function<void(TcpConnection*, Buffer*)>;
     using CloseCallback   = std::function<void(TcpConnection*)>;
     using WriteCompleteCallback = std::function<void(TcpConnection*)>;
 
-    TcpConnection(EventLoop* loop, int connfd, sockaddr_in& addr);
+    TcpConnection(EventLoop* loop, int connfd, const sockaddr_in& addr);
     ~TcpConnection();
 
     // 禁止拷贝
@@ -34,12 +38,13 @@ public:
 
     int fd() const { return connfd_; }
     const std::string& name() const { return name_; }
+    EventLoop* getLoop() const { return loop_; }
 
-    // 发送数据（线程安全地写入 buffer 并关注可写事件）
+    // 发送数据（线程安全）
     void send(const std::string& message);
     void send(const char* data, size_t len);
 
-    // 关闭连接
+    // 关闭连接写端
     void shutdown();
 
     // 设置回调
@@ -48,6 +53,10 @@ public:
     void setWriteCompleteCallback(WriteCompleteCallback cb) { writeCompleteCallback_ = std::move(cb); }
 
 private:
+    // 以下 3 个函数只在 loop_ 线程上执行
+    void sendInLoop(const char* data, size_t len);
+    void shutdownInLoop();
+
     void handleRead();
     void handleWrite();
     void handleClose();

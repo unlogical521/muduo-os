@@ -12,6 +12,8 @@ add_library(reactor
     TcpConnection.cpp
     Buffer.cpp
     Server.cpp
+    EventLoopThread.cpp
+    EventLoopThreadPool.cpp
 )
 
 # 服务器可执行文件

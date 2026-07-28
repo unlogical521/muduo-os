@@ -1,41 +1,37 @@
 //
-// 基于 Reactor 模式的 epoll 服务器（主入口）
+// 基于多 Reactor 多线程的 epoll 服务器（主入口）
 //
 // 用法：
-//   ./server          ← 启动 echo 服务器（端口 8080）
-//   ./server 9090     ← 启动 echo 服务器（端口 9090）
+//   ./re_server            ← 启动（单 reactor，主线程处理所有）
+//   ./re_server 8080       ← 指定端口
+//   ./re_server 8080 4     ← 指定端口 + 4 个 sub-reactor 线程
 //
-// 设计思路（Reactor 模式）：
+// 架构（多 Reactor）：
 //
-//   ┌──────────────────────────────────────────────────┐
-//   │                     Server                        │
-//   │  ┌──────────┐   ┌──────────────────────────────┐  │
-//   │  │ Acceptor │   │   TcpConnection 集合          │  │
-//   │  │  (listen)│   │   ┌──────┐ ┌──────┐ ┌──────┐ │  │
-//   │  │  ┌─────┐ │   │   │ conn │ │ conn │ │ conn │ │  │
-//   │  │  │Chnl │ │   │   │┌───┐ │ │┌───┐ │ │┌───┐ │ │  │
-//   │  │  └─────┘ │   │   ││Chnl││ ││Chnl││ ││Chnl││ │  │
-//   │  └──────────┘   │   │└───┘ │ │└───┘ │ │└───┘ │ │  │
-//   │                 │   └──────┘ └──────┘ └──────┘ │  │
-//   │                 └──────────────────────────────┘  │
-//   └──────────────────────────────────────────────────┘
-//                          │ 事件分发（epoll_wait）
-//                          ▼
-//                   ┌──────────────┐
-//                   │  EventLoop   │
-//                   │  (epoll fd)  │
-//                   └──────────────┘
+//   Main Reactor (main thread)
+//   ┌──────────────────────────┐
+//   │ accept → 分发到 sub-reactor│
+//   └──────────┬───────────────┘
+//              │ runInLoop()
+//     ┌────────┼────────┐
+//     ▼        ▼        ▼
+//   SubR[0]  SubR[1]  SubR[2]  (EventLoopThread 线程池)
+//   ┌────┐   ┌────┐   ┌────┐
+//   │IO  │   │IO  │   │IO  │
+//   │重  │   │重  │   │重  │
+//   │任  │   │任  │   │任  │
+//   └────┘   └────┘   └────┘
 //
-//  1. EventLoop 封装 epoll，负责事件循环
-//  2. Channel 封装一个 fd 及其回调
-//  3. Acceptor 封装监听 fd，新连接到来时 accept
-//  4. TcpConnection 封装一个已连接 fd，处理读写
-//  5. Server 组装一切，对外暴露消息回调
+// 优点：
+//   - 每个 sub-reactor 只处理自己负责的 fd，无锁 IO
+//   - 多核并行，水平扩展
+//   - 线程池避免频繁创建/销毁线程
 //
 #include <iostream>
 #include <memory>
 #include <cstring>
 #include <unistd.h>
+#include <thread>
 
 #include "EventLoop.h"
 #include "Server.h"
@@ -44,27 +40,30 @@
 
 int main(int argc, char* argv[]) {
     int port = 8080;
-    if (argc > 1) {
-        port = std::atoi(argv[1]);
-    }
+    int ioThreads = 2;  // 默认 2 个 sub-reactor 线程（不含 main reactor）
 
-    std::cout << "=== Reactor epoll server ===" << std::endl;
-    std::cout << "Listening on port " << port << std::endl;
-    std::cout << "============================" << std::endl;
+    if (argc > 1) port = std::atoi(argv[1]);
+    if (argc > 2) ioThreads = std::atoi(argv[2]);
 
-    // 创建事件循环
-    EventLoop loop;
+    std::cout << "=== Multi-Reactor epoll server ===" << std::endl;
+    std::cout << "Port:       " << port << std::endl;
+    std::cout << "IO threads: " << ioThreads << " (sub-reactors)" << std::endl;
+    std::cout << "==================================" << std::endl;
 
-    // 创建服务器
-    Server server(&loop, port);
+    // 创建主 Reactor 的 EventLoop
+    EventLoop mainLoop;
 
-    // 设置连接回调（可选）
+    // 创建服务器（Acceptor 注册在 mainLoop）
+    Server server(&mainLoop, port);
+    server.setThreadNum(ioThreads);
+
+    // 设置连接回调
     server.setConnectionCallback([](TcpConnection* conn) {
         std::cout << "[connection] " << conn->name()
-                  << " (fd=" << conn->fd() << ") connected" << std::endl;
-
-        // 发送欢迎消息
-        conn->send("Welcome to Reactor echo server!\r\n");
+                  << " handled by thread "
+                  << std::this_thread::get_id()
+                  << std::endl;
+        conn->send("Welcome to Multi-Reactor echo server!\r\n");
     });
 
     // 设置消息回调 — echo 服务
@@ -73,24 +72,22 @@ int main(int argc, char* argv[]) {
 
         // 去掉末尾换行仅用于日志显示
         std::string log = msg;
-        if (!log.empty() && (log.back() == '\n' || log.back() == '\r')) {
-            log.pop_back();
-        }
-        if (!log.empty() && (log.back() == '\r' || log.back() == '\n')) {
+        while (!log.empty() && (log.back() == '\n' || log.back() == '\r')) {
             log.pop_back();
         }
         std::cout << "[message] from " << conn->name()
+                  << " on thread " << std::this_thread::get_id()
                   << ": " << log << std::endl;
 
         // 回显
         conn->send(msg);
     });
 
-    // 启动服务器
+    // 启动服务器（start 内部会启动 sub-reactor 线程池）
     server.start();
 
-    // 进入事件循环（永不返回，除非 quit）
-    loop.loop();
+    // 主 Reactor 进入事件循环（mainLoop 在 main 线程运行）
+    mainLoop.loop();
 
     return 0;
 }

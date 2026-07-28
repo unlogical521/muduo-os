@@ -9,8 +9,11 @@ Channel::Channel(EventLoop* loop, int fd)
     : loop_(loop), fd_(fd), events_(0), revents_(0) {}
 
 Channel::~Channel() {
-    // 确保析构时已从 epoll 移除
-    disableAll();
+    // 如果 events_ 不为 0，需要从 epoll 移除
+    // 若 events_ 已为 0（handleClose 已调用过 disableAll），跳过
+    if (!isNoneEvent()) {
+        disableAll();
+    }
 }
 
 void Channel::update() {
@@ -18,10 +21,12 @@ void Channel::update() {
 }
 
 void Channel::handleEvent() {
+    // 回调函数中，需要进行双重判断
+    // 1、实际发生了什么事件
+    // 2、该fd关注什么事件
     if (revents_ & (EPOLLERR)) {
         if (errorCallback_) errorCallback_();
     }
-
     if (revents_ & (EPOLLIN | EPOLLPRI | EPOLLRDHUP)) {
         if (revents_ & EPOLLRDHUP) {
             // 对方关闭连接
