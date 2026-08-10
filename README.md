@@ -168,9 +168,9 @@ python3 test_chat.py   # 多客户端模拟：上线/发言/离线广播 + 心�
 | `benchmark/` | 压测 | 高性能压测客户端，用于对比不同模型的吞吐 |
 | `os_practice/` | 前置 | fork / exec / pipe 等操作系统基础练习 |
 
-## 局限与后续方向（诚实说明）
+## 局限与后续方向
 
 - **单 Acceptor，未处理惊群**：多 Reactor 下只有一个主线程 accept，天然无惊群；若追求多核 accept，可扩展 `SO_REUSEPORT` 或 `EPOLLEXCLUSIVE`。
 - **无 TCP 背压**：output buffer 无上限，未实现 muduo 的 `setHighWaterMarkCallback` 保护慢客户端。
 - **未实现 `cancel()`**：定时器暂不支持取消，已留出扩展设计。
-- **性能数据待补**：可用 `benchmark/perf_client` 跑出真实 QPS/连接数后填入本文档，避免主观声称。
+- **性能数据待补**：
