@@ -1,1 +1,1 @@
-/usr/bin/c++ CMakeFiles/re_server.dir/server.cpp.o -o re_server  libreactor.a 
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/re_server.dir/server.cpp.o -o re_server  libreactor.a 

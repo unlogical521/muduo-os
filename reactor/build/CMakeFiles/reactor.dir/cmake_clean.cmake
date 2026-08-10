@@ -15,6 +15,10 @@ file(REMOVE_RECURSE
   "CMakeFiles/reactor.dir/Server.cpp.o.d"
   "CMakeFiles/reactor.dir/TcpConnection.cpp.o"
   "CMakeFiles/reactor.dir/TcpConnection.cpp.o.d"
+  "CMakeFiles/reactor.dir/Timer.cpp.o"
+  "CMakeFiles/reactor.dir/Timer.cpp.o.d"
+  "CMakeFiles/reactor.dir/TimerQueue.cpp.o"
+  "CMakeFiles/reactor.dir/TimerQueue.cpp.o.d"
   "libreactor.a"
   "libreactor.pdb"
 )

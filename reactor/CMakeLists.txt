@@ -14,6 +14,8 @@ add_library(reactor
     Server.cpp
     EventLoopThread.cpp
     EventLoopThreadPool.cpp
+    Timer.cpp
+    TimerQueue.cpp
 )
 
 # 服务器可执行文件

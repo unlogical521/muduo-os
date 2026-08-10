@@ -1,1 +1,1 @@
-/usr/bin/c++ CMakeFiles/re_client.dir/client.cpp.o -o re_client  libreactor.a 
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/re_client.dir/client.cpp.o -o re_client  libreactor.a 

@@ -347,6 +347,54 @@ TcpConnection.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/reactor.dir/build.make CMakeFiles/reactor.dir/TcpConnection.cpp.s
 .PHONY : TcpConnection.cpp.s
 
+Timer.o: Timer.cpp.o
+.PHONY : Timer.o
+
+# target to build an object file
+Timer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/reactor.dir/build.make CMakeFiles/reactor.dir/Timer.cpp.o
+.PHONY : Timer.cpp.o
+
+Timer.i: Timer.cpp.i
+.PHONY : Timer.i
+
+# target to preprocess a source file
+Timer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/reactor.dir/build.make CMakeFiles/reactor.dir/Timer.cpp.i
+.PHONY : Timer.cpp.i
+
+Timer.s: Timer.cpp.s
+.PHONY : Timer.s
+
+# target to generate assembly for a file
+Timer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/reactor.dir/build.make CMakeFiles/reactor.dir/Timer.cpp.s
+.PHONY : Timer.cpp.s
+
+TimerQueue.o: TimerQueue.cpp.o
+.PHONY : TimerQueue.o
+
+# target to build an object file
+TimerQueue.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/reactor.dir/build.make CMakeFiles/reactor.dir/TimerQueue.cpp.o
+.PHONY : TimerQueue.cpp.o
+
+TimerQueue.i: TimerQueue.cpp.i
+.PHONY : TimerQueue.i
+
+# target to preprocess a source file
+TimerQueue.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/reactor.dir/build.make CMakeFiles/reactor.dir/TimerQueue.cpp.i
+.PHONY : TimerQueue.cpp.i
+
+TimerQueue.s: TimerQueue.cpp.s
+.PHONY : TimerQueue.s
+
+# target to generate assembly for a file
+TimerQueue.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/reactor.dir/build.make CMakeFiles/reactor.dir/TimerQueue.cpp.s
+.PHONY : TimerQueue.cpp.s
+
 client.o: client.cpp.o
 .PHONY : client.o
 
@@ -430,6 +478,12 @@ help:
 	@echo "... TcpConnection.o"
 	@echo "... TcpConnection.i"
 	@echo "... TcpConnection.s"
+	@echo "... Timer.o"
+	@echo "... Timer.i"
+	@echo "... Timer.s"
+	@echo "... TimerQueue.o"
+	@echo "... TimerQueue.i"
+	@echo "... TimerQueue.s"
 	@echo "... client.o"
 	@echo "... client.i"
 	@echo "... client.s"
