@@ -16,7 +16,14 @@ add_library(reactor
     EventLoopThreadPool.cpp
     Timer.cpp
     TimerQueue.cpp
+    LogStream.cpp
+    Logger.cpp
+    AsyncLogging.cpp
 )
+
+# 日志/线程需要 pthread（std::thread）
+find_package(Threads REQUIRED)
+target_link_libraries(reactor Threads::Threads)
 
 # 服务器可执行文件
 add_executable(re_server server.cpp)

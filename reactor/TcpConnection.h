@@ -74,6 +74,13 @@ public:
     // 避免在用户回调（如 messageCallback）内直接销毁对象
     void forceClose();
 
+    // 立即关闭连接（单阶段，仅用于服务器析构/关闭路径）
+    // 与 forceClose 的区别：不走延迟关闭状态机，直接调度 handleClose，
+    // 使 Channel 立即 disableAll 并从所属 epoll 摘除。
+    // 用途：Server 析构时先在各自的 sub-reactor 线程上把连接收干净，
+    //   保证随后线程池 stop()（join）时，连接已无事件注册、析构不再触碰 EventLoop。
+    void closeNow();
+
     // 设置回调
     void setMessageCallback(MessageCallback cb)       { messageCallback_       = std::move(cb); }
     void setCloseCallback(CloseCallback cb)           { closeCallback_         = std::move(cb); }

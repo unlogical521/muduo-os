@@ -5,12 +5,15 @@
 #include "Channel.h"
 #include "Buffer.h"
 #include "EventLoop.h"
-#include <iostream>
+#include "Logger.h"
 #include <sys/socket.h>
 #include <unistd.h>
+#include <atomic>
 
 namespace {
-    int conn_count = 0;
+    // 连接编号计数器：连接在多个 sub-reactor 线程上并发构造，
+    // 普通 int 自增是数据竞争（UB），必须用原子
+    std::atomic<int> conn_count{0};
 }
 
 // 构造函数
@@ -38,7 +41,10 @@ TcpConnection::TcpConnection(EventLoop* loop, int connfd, const sockaddr_in& add
 TcpConnection::~TcpConnection() {
     // 析构时由 Channel 析构函数自动处理 epoll 摘除（若 events_ 不为 0）
     // close(fd) 会自动清理内核中该 fd 关联的 epoll 注册，
-    // 但为防止 Channel 析构时的 disableAll 重复调用 epoll_ctl DEL，已在 handleClose 中调用
+    // 但为防止 Channel 析构时的 disableAll 重复调用 epoll_ctl DEL，已在 handleClose 中调用。
+    // 关键不变式：析构时 channel 必须已是 none-event（handleClose 已 disableAll），
+    // 否则 Channel 析构会调用 loop_->updateChannel 触碰可能已销毁的 EventLoop → 崩溃。
+    // 这条不变式由 handleClose 幂等 + sendInLoop/handleWrite 的 kDisconnected 守卫保证。
     ::close(connfd_);
 }
 
@@ -81,6 +87,12 @@ void TcpConnection::send(const char* data, size_t len) {
 //   - 如果每次 send 都入 buffer + enableWriting，会至少多一次 epoll_wait 才写出去
 //   - 对于小数据包（如大多数业务消息），直接 write 一次就能写完，延迟更低
 void TcpConnection::sendInLoop(const char* data, size_t len) {
+    // 连接已关闭（如服务器析构 closeNow 已摘除）：拒绝再写/再注册事件。
+    // 否则排队的 send 回调（如关闭前广播的跨线程投递）会在 handleClose 之后
+    // 重新 enableWriting，让已 none-event 的 Channel 在 loop 销毁后仍注册 → 析构崩溃。
+    if (state_ == State::kDisconnected) {
+        return;
+    }
     ssize_t nwritten = 0;
     if (output_buffer_->readableBytes() == 0) {
         // output buffer 为空 → 尝试直接 write（内核写缓冲区大概率有空闲）
@@ -90,8 +102,8 @@ void TcpConnection::sendInLoop(const char* data, size_t len) {
                 // 内核写缓冲区满，本次无法写入任何数据
                 nwritten = 0;
             } else {
-                std::cerr << "TcpConnection::sendInLoop write error"
-                          << " name=" << name_ << std::endl;
+                LOG_ERROR << "TcpConnection::sendInLoop write error"
+                          << " name=" << name_;
                 return;
             }
         }
@@ -130,7 +142,7 @@ void TcpConnection::shutdown() {
 // 这是优雅关闭的第一步（等读完所有数据后再 close）
 void TcpConnection::shutdownInLoop() {
     if (::shutdown(connfd_, SHUT_WR) < 0) {
-        std::cerr << "TcpConnection::shutdownInLoop error name=" << name_ << std::endl;
+        LOG_ERROR << "TcpConnection::shutdownInLoop error name=" << name_;
     }
 }
 
@@ -144,6 +156,18 @@ void TcpConnection::forceClose() {
     } else {
         loop_->runInLoop([self = shared_from_this()]() {
             self->forceCloseInLoop();
+        });
+    }
+}
+
+// closeNow — 单阶段立即关闭（服务器析构路径用）
+// 直接调度 handleClose 到所属 loop 线程；已关闭的连接跳过（幂等）。
+void TcpConnection::closeNow() {
+    if (loop_->isInLoopThread()) {
+        if (state_ != State::kDisconnected) handleClose();
+    } else {
+        loop_->runInLoop([self = shared_from_this()]() {
+            if (self->state_ != State::kDisconnected) self->handleClose();
         });
     }
 }
@@ -201,6 +225,11 @@ void TcpConnection::handleRead() {
 // 将 output_buffer_ 中积压的数据写入 fd
 // 如果全部写完了，取消 EPOLLOUT 关注
 void TcpConnection::handleWrite() {
+    // 已断开：不再写。否则 disableWriting 在 events_ 已为 0 时会走
+    // EPOLL_CTL_DEL + erase(channels_) 路径，触碰已关闭的 epoll/EventLoop。
+    if (state_ == State::kDisconnected) {
+        return;
+    }
     ssize_t n = ::write(connfd_,
                         output_buffer_->peek(),
                         output_buffer_->readableBytes());
@@ -215,7 +244,7 @@ void TcpConnection::handleWrite() {
             }
         }
     } else {
-        std::cerr << "TcpConnection::handleWrite error name=" << name_ << std::endl;
+        LOG_ERROR << "TcpConnection::handleWrite error name=" << name_;
     }
 }
 
@@ -223,7 +252,14 @@ void TcpConnection::handleWrite() {
 // 1. 从 epoll 中移除对该 fd 的监听（disableAll）
 // 2. 通知上层连接已关闭（closeCallback_ → Server::onCloseConnection）
 // 注意：不在这里 close(fd)，因为 TcpConnection 析构时会 close
+//
+// 幂等性：state_ == kDisconnected 时直接返回。防止重复调用（如 closeNow 调度
+// 的 handleClose 与 EOF handleRead 触发的 handleClose 竞态）导致
+// 重复 disableAll / 重复 closeCallback（后者会触发 Server 重复 erase）。
 void TcpConnection::handleClose() {
+    if (state_ == State::kDisconnected) {
+        return;
+    }
     state_ = State::kDisconnected;
     channel_->disableAll();
     if (closeCallback_) {
@@ -234,5 +270,5 @@ void TcpConnection::handleClose() {
 // handleError — 处理 fd 上的错误
 // 仅打印日志，具体重连或恢复策略由上层业务决定
 void TcpConnection::handleError() {
-    std::cerr << "TcpConnection[" << name_ << "] error on fd=" << connfd_ << std::endl;
+    LOG_ERROR << "TcpConnection[" << name_ << "] error on fd=" << connfd_;
 }

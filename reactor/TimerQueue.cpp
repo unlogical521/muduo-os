@@ -5,9 +5,9 @@
 #include "Timer.h"
 #include "Channel.h"
 #include "EventLoop.h"
+#include "Logger.h"
 #include <sys/timerfd.h>
 #include <unistd.h>
-#include <iostream>
 
 // timerfd 到期时内核会写入一个 8 字节计数（本次触发的次数）
 // 每次读走这个计数，计数器清零，为下一次到期做准备
@@ -22,8 +22,7 @@ TimerQueue::TimerQueue(EventLoop* loop)
     // TFD_NONBLOCK：读不阻塞；TFD_CLOEXEC：exec 时自动关闭
     timerfd_ = ::timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
     if (timerfd_ < 0) {
-        std::cerr << "TimerQueue: timerfd_create failed" << std::endl;
-        abort();
+        LOG_FATAL << "TimerQueue: timerfd_create failed";
     }
 
     // 为 timerfd 创建 Channel，注册到 EventLoop
@@ -68,7 +67,7 @@ void TimerQueue::handleRead() {
     uint64_t expirations;
     ssize_t n = ::read(timerfd_, &expirations, sizeof(expirations));
     if (n != static_cast<ssize_t>(sizeof(expirations))) {
-        std::cerr << "TimerQueue::handleRead read timerfd failed" << std::endl;
+        LOG_ERROR << "TimerQueue::handleRead read timerfd failed";
         return;
     }
 
@@ -125,7 +124,7 @@ void TimerQueue::resetTimerfd() {
     // 注：repeat 逻辑由 Timer::restart() + 重新入队维护，这里不设 it_interval
 
     if (::timerfd_settime(timerfd_, TFD_TIMER_ABSTIME, &new_value, nullptr) < 0) {
-        std::cerr << "TimerQueue::resetTimerfd timerfd_settime failed" << std::endl;
+        LOG_ERROR << "TimerQueue::resetTimerfd timerfd_settime failed";
     }
 }
 

@@ -1,5 +1,5 @@
 //
-// 基于多 Reactor 多线程的 epoll 聊天室（演示 Server 的断连回调 + 连接表）
+// 基于多 Reactor 多线程的 epoll 聊天室（演示异步日志 + 心跳 + 断连回调 + 连接表）
 //
 // 用法：
 //   ./re_server                  ← 启动（2 个 sub-reactor 线程）
@@ -7,10 +7,11 @@
 //   ./re_server 9090 4           ← 指定端口 + 4 个 sub-reactor 线程
 //   ./re_server 8080 0           ← 单线程模式（全部在主 reactor）
 //
-// 本 demo 展示 Server 的三个新增能力：
-//   1. setCloseCallback     → 连接断开时通知应用层（广播 "xx left"）
-//   2. getAllConnections()  → 拿到全连接表做广播（聊天室的核心）
-//   3. setHeartbeat        → 心跳超时检测，空闲连接自动踢出（拔网线/进程崩溃的半开连接回收）
+// 本 demo 展示的库能力：
+//   1. 异步日志   → 全部日志走 AsyncLogging（双缓冲 + 后台线程），不阻塞 IO 线程
+//   2. 心跳       → 空闲超时连接自动强制关闭（回收半开连接）
+//   3. setCloseCallback   → 连接断开时通知应用层（广播 "xx left"）
+//   4. getAllConnections → 拿到全连接表做广播（聊天室核心）
 //
 // 架构（多 Reactor）：
 //
@@ -28,17 +29,45 @@
 //   │任  │   │任  │   │任  │
 //   └────┘   └────┘   └────┘
 //
-#include <iostream>
 #include <memory>
 #include <cstring>
 #include <unistd.h>
-#include <thread>
 #include <chrono>
+#include <csignal>
 
 #include "EventLoop.h"
 #include "Server.h"
 #include "TcpConnection.h"
 #include "Buffer.h"
+#include "Logger.h"
+#include "AsyncLogging.h"
+
+// ========== 异步日志初始化 ==========
+// 进程级单例：日志写 server.*.pid.log，按大小滚动，每 3 秒强制落盘
+AsyncLogging g_asyncLog("server", 100 * 1024 * 1024, 3);
+
+// 主事件循环指针（供信号处理器触发优雅退出）
+EventLoop* g_mainLoop = nullptr;
+
+// 把 Logger 的输出/刷新接到异步日志后端
+// 此后所有 LOG_XXX 都走双缓冲 + 后台线程，IO 线程不碰磁盘
+static void initLogging() {
+    Logger::setOutput([](const char* msg, int len) {
+        g_asyncLog.append(msg, len);
+    });
+    Logger::setFlush([]() {
+        g_asyncLog.flush();
+    });
+    g_asyncLog.start();
+    LOG_INFO << "[logging] async logging started (server.*.log)";
+}
+
+// Ctrl-C / kill → 优雅退出：quit 事件循环 → main 返回 → 全局对象析构 → 日志落盘
+static void signalHandler(int) {
+    if (g_mainLoop) {
+        g_mainLoop->quit();
+    }
+}
 
 // 广播一条消息到所有连接（可选排除某个连接）
 // from == nullptr  → 发给所有人（包括发消息的人，聊天室"自己也看得到"）
@@ -61,13 +90,19 @@ int main(int argc, char* argv[]) {
     if (argc > 1) port = std::atoi(argv[1]);
     if (argc > 2) ioThreads = std::atoi(argv[2]);
 
-    std::cout << "=== Multi-Reactor Chat Server ===" << std::endl;
-    std::cout << "Port:       " << port << std::endl;
-    std::cout << "IO threads: " << ioThreads << " (sub-reactors)" << std::endl;
-    std::cout << "==================================" << std::endl;
+    // 先初始化日志，后续所有输出都进异步日志文件
+    initLogging();
+
+    LOG_INFO << "=== Multi-Reactor Chat Server ===";
+    LOG_INFO << "Port: " << port << ", IO threads: " << ioThreads << " (sub-reactors)";
 
     // 创建主 Reactor 的 EventLoop（在 main 线程上运行）
     EventLoop mainLoop;
+    g_mainLoop = &mainLoop;
+
+    // 注册信号：Ctrl-C / kill 优雅退出
+    ::signal(SIGINT, signalHandler);
+    ::signal(SIGTERM, signalHandler);
 
     // 创建服务器（Acceptor 注册在 mainLoop）
     Server server(&mainLoop, port);
@@ -79,11 +114,9 @@ int main(int argc, char* argv[]) {
 
     // 连接回调 —— 新连接上线（在 sub-reactor 线程执行）
     // 广播"xx joined"，并给新人单独发欢迎语（含自己的名字）
+    // 日志格式头自带线程 id，可据此观察连接被分发到哪个 reactor 线程
     server.setConnectionCallback([&server](TcpConnection* conn) {
-        std::cout << "[connection] " << conn->name()
-                  << " handled by thread "
-                  << std::this_thread::get_id()
-                  << std::endl;
+        LOG_INFO << "[connection] " << conn->name() << " connected";
 
         broadcast(server, conn, "[chat] " + conn->name() + " joined\r\n");
         conn->send("[chat] welcome, you are " + conn->name() + "\r\n");
@@ -99,9 +132,7 @@ int main(int argc, char* argv[]) {
         while (!log.empty() && (log.back() == '\n' || log.back() == '\r')) {
             log.pop_back();
         }
-        std::cout << "[message] from " << conn->name()
-                  << " on thread " << std::this_thread::get_id()
-                  << ": " << log << std::endl;
+        LOG_INFO << "[message] from " << conn->name() << ": " << log;
 
         broadcast(server, nullptr, "[chat] " + conn->name() + " " + msg);
     });
@@ -109,16 +140,18 @@ int main(int argc, char* argv[]) {
     // 断连回调 —— 新增能力（在 sub-reactor 线程执行）
     // 连接还没从 connections_ 移除（erase 在回调之后），但仍广播给除它以外的所有人
     server.setCloseCallback([&server](TcpConnection* conn) {
-        std::cout << "[close] " << conn->name() << " disconnected" << std::endl;
+        LOG_INFO << "[close] " << conn->name() << " disconnected";
         broadcast(server, conn, "[chat] " + conn->name() + " left\r\n");
     });
 
-    // 启动服务器（start 内部会启动 sub-reactor 线程池）
+    // 启动服务器（start 内部会启动 sub-reactor 线程池 + 心跳定时器）
     server.start();
 
     // 主 Reactor 进入事件循环（mainLoop 在 main 线程运行）
     // 主 Reactor 负责任务：监听 fd 的 accept + 将新连接分发给 sub-reactor
     mainLoop.loop();
 
+    // 优雅退出路径：Ctrl-C 触发后走到这里
+    LOG_INFO << "[server] event loop quit, shutting down...";
     return 0;
 }

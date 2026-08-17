@@ -4,7 +4,7 @@
 #include "Acceptor.h"
 #include "Channel.h"
 #include "EventLoop.h"
-#include <iostream>
+#include "Logger.h"
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -19,8 +19,7 @@ Acceptor::Acceptor(EventLoop* loop, int port)
     // SOCK_NONBLOCK | SOCK_CLOEXEC：非阻塞 + exec 时自动关闭 fd
     accept_fd_ = ::socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
     if (accept_fd_ < 0) {
-        std::cerr << "Acceptor: socket failed" << std::endl;
-        abort();
+        LOG_FATAL << "Acceptor: socket failed";
     }
 
     // 2. 端口复用
@@ -35,9 +34,8 @@ Acceptor::Acceptor(EventLoop* loop, int port)
     addr.sin_port = htons(port);
 
     if (::bind(accept_fd_, (sockaddr*)&addr, sizeof(addr)) < 0) {
-        std::cerr << "Acceptor: bind failed" << std::endl;
         ::close(accept_fd_);
-        abort();
+        LOG_FATAL << "Acceptor: bind failed";
     }
 
     // 4. 创建 Channel，但不立即监听（listen() 时才加入 EventLoop）
@@ -56,7 +54,7 @@ Acceptor::~Acceptor() {
 //    此后 epoll_wait 会检测新连接事件
 void Acceptor::listen() {
     if (::listen(accept_fd_, 128) < 0) {
-        std::cerr << "Acceptor: listen failed" << std::endl;
+        LOG_ERROR << "Acceptor: listen failed";
         return;
     }
     listening_ = true;
@@ -92,7 +90,7 @@ void Acceptor::handleRead() {
                 break;
             }
             // 其他错误（如 ENFILE 系统 fd 耗尽）
-            std::cerr << "Acceptor: accept failed errno=" << errno << std::endl;
+            LOG_ERROR << "Acceptor: accept failed errno=" << errno;
             break;
         }
 

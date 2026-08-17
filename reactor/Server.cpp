@@ -7,7 +7,7 @@
 #include "TcpConnection.h"
 #include "Buffer.h"
 #include "EventLoopThreadPool.h"
-#include <iostream>
+#include "Logger.h"
 
 // 构造函数
 // 1. 创建 Acceptor（注册在主 Reactor 上）
@@ -23,7 +23,32 @@ Server::Server(EventLoop* loop, int port)
     threadPool_ = std::make_unique<EventLoopThreadPool>(loop, "reactor");
 }
 
-Server::~Server() = default;
+// 析构顺序至关重要（关闭期数据竞争修复）：
+//   members 逆序析构时 connections_ 先于 threadPool_ 被销毁。若让默认析构兜底，
+//   仍注册着的连接会在 main 线程被析构，此时 sub-reactor 线程还在 epoll_wait/handleEvent
+//   并发访问同一个 channels_/epfd → 数据竞争。实测数据洪泛中关闭可稳定 SIGSEGV（8/10）。
+//
+//   修复必须在两个方向上同时成立：
+//   ① 先停线程再释放连接 → 连接析构时 Channel 会对已析构的 EventLoop epoll_ctl → use-after-free，同样崩溃；
+//   ② 直接释放连接（默认顺序）→ 与运行中的子线程竞争，崩溃。
+//   正确顺序：先在各自的 sub-reactor 线程上 closeNow()（handleClose → disableAll → 从 epoll 摘除，
+//   Channel 变为 none-event），再 stop()（join 保证关闭逻辑已在退出前执行完），
+//   最后 connections_ 成员析构时 Channel 已是 none-event，析构不触碰 loop。
+//
+//   还有第三个坑：stop() 是逐个 join 线程的，后停的线程在最后一次事件批处理里
+//   若仍触发应用层广播（message/close 回调 → 其它连接的 send → runInLoop 到其它 loop），
+//   可能碰到已先 join、其栈上 EventLoop 已析构的 loop → use-after-free。
+//   因此析构一开始就先置空应用层回调，关闭交错期不再有任何跨 loop 投递。
+Server::~Server() {
+    messageCallback_  = nullptr;
+    connectionCallback_ = nullptr;
+    closeCallback_    = nullptr;
+
+    for (auto& conn : getAllConnections()) {
+        conn->closeNow();
+    }
+    threadPool_->stop();
+}
 
 void Server::setThreadNum(int num) {
     ioThreadCount_ = num;
@@ -50,13 +75,13 @@ void Server::start() {
         // 注册定时器：每 heartbeatInterval_ 扫描一次连接表
         // start() 在 main 线程、mainLoop.loop() 之前调用，runInLoop 同线程直接执行，安全
         loop_->runEvery(heartbeatInterval_, [this] { checkHeartbeats(); });
-        std::cout << "[Server] heartbeat enabled (timeout="
-                  << heartbeatTimeout_.count() << "ms, interval="
-                  << heartbeatInterval_.count() << "ms)" << std::endl;
+        LOG_INFO << "[Server] heartbeat enabled (timeout="
+                 << heartbeatTimeout_.count() << "ms, interval="
+                 << heartbeatInterval_.count() << "ms)";
     }
 
-    std::cout << "[Server] started  (1 main reactor + "
-              << ioThreadCount_ << " sub-reactor(s))" << std::endl;
+    LOG_INFO << "[Server] started  (1 main reactor + "
+             << ioThreadCount_ << " sub-reactor(s))";
 }
 
 // ========== 心跳扫描 ==========
@@ -70,8 +95,8 @@ void Server::start() {
 void Server::checkHeartbeats() {
     for (auto& conn : getAllConnections()) {
         if (conn->isIdle(heartbeatTimeout_)) {
-            std::cout << "[Server] force close idle " << conn->name()
-                      << " (fd=" << conn->fd() << ")" << std::endl;
+            LOG_INFO << "[Server] force close idle " << conn->name()
+                     << " (fd=" << conn->fd() << ")";
             conn->forceClose();
         }
     }
@@ -109,8 +134,8 @@ void Server::onNewConnection(int connfd, const sockaddr_in& addr) {
             connections_[fd] = conn;
         }
 
-        std::cout << "[Server] new " << connName
-                  << " on reactor thread (fd=" << fd << ")" << std::endl;
+        LOG_INFO << "[Server] new " << connName
+                 << " on reactor thread (fd=" << fd << ")";
 
         if (connectionCallback_) {
             connectionCallback_(conn.get());
@@ -137,8 +162,7 @@ void Server::onMessage(TcpConnection* conn, Buffer* buf) {
 // 适合做"xx 离开了聊天室"之类的清理或广播，然后再真正回收。
 void Server::onCloseConnection(TcpConnection* conn) {
     int fd = conn->fd();
-    std::cout << "[Server] " << conn->name() << " closed (fd=" << fd << ")"
-              << std::endl;
+    LOG_INFO << "[Server] " << conn->name() << " closed (fd=" << fd << ")";
 
     if (closeCallback_) {
         closeCallback_(conn);

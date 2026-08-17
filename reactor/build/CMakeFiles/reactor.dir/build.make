@@ -209,6 +209,48 @@ CMakeFiles/reactor.dir/TimerQueue.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/reactor.dir/TimerQueue.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/illogical/project/muduo/reactor/TimerQueue.cpp -o CMakeFiles/reactor.dir/TimerQueue.cpp.s
 
+CMakeFiles/reactor.dir/LogStream.cpp.o: CMakeFiles/reactor.dir/flags.make
+CMakeFiles/reactor.dir/LogStream.cpp.o: ../LogStream.cpp
+CMakeFiles/reactor.dir/LogStream.cpp.o: CMakeFiles/reactor.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/illogical/project/muduo/reactor/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Building CXX object CMakeFiles/reactor.dir/LogStream.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/reactor.dir/LogStream.cpp.o -MF CMakeFiles/reactor.dir/LogStream.cpp.o.d -o CMakeFiles/reactor.dir/LogStream.cpp.o -c /home/illogical/project/muduo/reactor/LogStream.cpp
+
+CMakeFiles/reactor.dir/LogStream.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/reactor.dir/LogStream.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/illogical/project/muduo/reactor/LogStream.cpp > CMakeFiles/reactor.dir/LogStream.cpp.i
+
+CMakeFiles/reactor.dir/LogStream.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/reactor.dir/LogStream.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/illogical/project/muduo/reactor/LogStream.cpp -o CMakeFiles/reactor.dir/LogStream.cpp.s
+
+CMakeFiles/reactor.dir/Logger.cpp.o: CMakeFiles/reactor.dir/flags.make
+CMakeFiles/reactor.dir/Logger.cpp.o: ../Logger.cpp
+CMakeFiles/reactor.dir/Logger.cpp.o: CMakeFiles/reactor.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/illogical/project/muduo/reactor/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Building CXX object CMakeFiles/reactor.dir/Logger.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/reactor.dir/Logger.cpp.o -MF CMakeFiles/reactor.dir/Logger.cpp.o.d -o CMakeFiles/reactor.dir/Logger.cpp.o -c /home/illogical/project/muduo/reactor/Logger.cpp
+
+CMakeFiles/reactor.dir/Logger.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/reactor.dir/Logger.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/illogical/project/muduo/reactor/Logger.cpp > CMakeFiles/reactor.dir/Logger.cpp.i
+
+CMakeFiles/reactor.dir/Logger.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/reactor.dir/Logger.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/illogical/project/muduo/reactor/Logger.cpp -o CMakeFiles/reactor.dir/Logger.cpp.s
+
+CMakeFiles/reactor.dir/AsyncLogging.cpp.o: CMakeFiles/reactor.dir/flags.make
+CMakeFiles/reactor.dir/AsyncLogging.cpp.o: ../AsyncLogging.cpp
+CMakeFiles/reactor.dir/AsyncLogging.cpp.o: CMakeFiles/reactor.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/illogical/project/muduo/reactor/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Building CXX object CMakeFiles/reactor.dir/AsyncLogging.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/reactor.dir/AsyncLogging.cpp.o -MF CMakeFiles/reactor.dir/AsyncLogging.cpp.o.d -o CMakeFiles/reactor.dir/AsyncLogging.cpp.o -c /home/illogical/project/muduo/reactor/AsyncLogging.cpp
+
+CMakeFiles/reactor.dir/AsyncLogging.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/reactor.dir/AsyncLogging.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/illogical/project/muduo/reactor/AsyncLogging.cpp > CMakeFiles/reactor.dir/AsyncLogging.cpp.i
+
+CMakeFiles/reactor.dir/AsyncLogging.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/reactor.dir/AsyncLogging.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/illogical/project/muduo/reactor/AsyncLogging.cpp -o CMakeFiles/reactor.dir/AsyncLogging.cpp.s
+
 # Object files for target reactor
 reactor_OBJECTS = \
 "CMakeFiles/reactor.dir/EventLoop.cpp.o" \
@@ -220,7 +262,10 @@ reactor_OBJECTS = \
 "CMakeFiles/reactor.dir/EventLoopThread.cpp.o" \
 "CMakeFiles/reactor.dir/EventLoopThreadPool.cpp.o" \
 "CMakeFiles/reactor.dir/Timer.cpp.o" \
-"CMakeFiles/reactor.dir/TimerQueue.cpp.o"
+"CMakeFiles/reactor.dir/TimerQueue.cpp.o" \
+"CMakeFiles/reactor.dir/LogStream.cpp.o" \
+"CMakeFiles/reactor.dir/Logger.cpp.o" \
+"CMakeFiles/reactor.dir/AsyncLogging.cpp.o"
 
 # External object files for target reactor
 reactor_EXTERNAL_OBJECTS =
@@ -235,9 +280,12 @@ libreactor.a: CMakeFiles/reactor.dir/EventLoopThread.cpp.o
 libreactor.a: CMakeFiles/reactor.dir/EventLoopThreadPool.cpp.o
 libreactor.a: CMakeFiles/reactor.dir/Timer.cpp.o
 libreactor.a: CMakeFiles/reactor.dir/TimerQueue.cpp.o
+libreactor.a: CMakeFiles/reactor.dir/LogStream.cpp.o
+libreactor.a: CMakeFiles/reactor.dir/Logger.cpp.o
+libreactor.a: CMakeFiles/reactor.dir/AsyncLogging.cpp.o
 libreactor.a: CMakeFiles/reactor.dir/build.make
 libreactor.a: CMakeFiles/reactor.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/illogical/project/muduo/reactor/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Linking CXX static library libreactor.a"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/illogical/project/muduo/reactor/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Linking CXX static library libreactor.a"
 	$(CMAKE_COMMAND) -P CMakeFiles/reactor.dir/cmake_clean_target.cmake
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/reactor.dir/link.txt --verbose=$(VERBOSE)
 

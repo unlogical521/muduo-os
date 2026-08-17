@@ -47,6 +47,10 @@ public:
     // 每个 EventLoopThread 内部会创建自己的 EventLoop
     void start();
 
+    // 停止线程池：逐个 quit + join 所有 sub-reactor 线程
+    // 必须在释放任何可能仍被这些线程引用的对象之前调用
+    void stop();
+
     // 轮询获取下一个 sub-reactor 的 EventLoop
     // 使用 round-robin 实现简单负载均衡
     EventLoop* getNextLoop();

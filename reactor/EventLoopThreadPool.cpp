@@ -4,7 +4,7 @@
 #include "EventLoopThreadPool.h"
 #include "EventLoopThread.h"
 #include "EventLoop.h"
-#include <iostream>
+#include "Logger.h"
 
 EventLoopThreadPool::EventLoopThreadPool(EventLoop* baseLoop,
                                          std::string name)
@@ -16,7 +16,15 @@ EventLoopThreadPool::EventLoopThreadPool(EventLoop* baseLoop,
 
 EventLoopThreadPool::~EventLoopThreadPool() {
     // EventLoopThread 的 unique_ptr 析构时自动触发 quit + join
-    // 无需额外清理
+    // 无需额外清理（若已显式 stop()，threads_ 为空）
+}
+
+// 停止线程池：显式退出所有 sub-reactor 线程并 join
+// threads_ 里的 EventLoopThread 析构时执行 quit() + join()，
+// 所以清空容器即完成"停线程并等它跑完"
+void EventLoopThreadPool::stop() {
+    threads_.clear();   // 触发每个 EventLoopThread 析构 → quit + join
+    loops_.clear();     // 线程退出后，栈上 EventLoop 已析构，指针失效
 }
 
 // 启动线程池
@@ -32,7 +40,7 @@ void EventLoopThreadPool::start() {
         // 创建 EventLoopThread，传递线程初始化回调（用于打印线程启动日志）
         auto t = std::make_unique<EventLoopThread>(
             [threadName](EventLoop* loop) {
-                std::cout << "[thread] " << threadName << " started" << std::endl;
+                LOG_INFO << "[thread] " << threadName << " started";
                 (void)loop;
             },
             threadName);
@@ -44,7 +52,7 @@ void EventLoopThreadPool::start() {
 
     if (threadNum_ == 0) {
         // 没有 IO 线程，所有连接在主 reactor 处理（退化到单线程模型）
-        std::cout << "[thread] no IO threads, using main reactor only" << std::endl;
+        LOG_INFO << "[thread] no IO threads, using main reactor only";
         loops_.push_back(baseLoop_);
     }
 }

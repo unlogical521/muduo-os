@@ -4,8 +4,9 @@
 #include "EventLoop.h"
 #include "Channel.h"
 #include "TimerQueue.h"
-#include <iostream>
+#include "Logger.h"
 #include <cassert>
+#include <csignal>
 #include <unistd.h>
 #include <sys/eventfd.h>
 
@@ -20,12 +21,17 @@ EventLoop::EventLoop()
       threadId_(std::this_thread::get_id()),
       callingPendingFunctors_(false) {
 
+    // TCP 服务器必须忽略 SIGPIPE：向已断开/被对端 RST 的 fd 写数据时，
+    // 内核会发 SIGPIPE，默认行为是终止整个进程。网络库应向调用方返回
+    // EPIPE/ECONNRESET 错误码（sendInLoop 已处理），而不是让进程猝死。
+    // 在第一个 EventLoop 构造时全局设置一次（进程级，重复设置无害）。
+    ::signal(SIGPIPE, SIG_IGN);
+
     // 创建 epoll 实例
     // epoll_create1(0) 相比 epoll_create(0) 去除了 size 参数，更简洁
     epfd_ = epoll_create1(0);
     if (epfd_ < 0) {
-        std::cerr << "EventLoop: epoll_create1 failed" << std::endl;
-        abort();
+        LOG_FATAL << "EventLoop: epoll_create1 failed";
     }
 
     // 创建 eventfd 用于跨线程唤醒
@@ -33,8 +39,7 @@ EventLoop::EventLoop()
     // 原理：其他线程向 wakeupFd_ 写入 1 → epoll_wait 立即返回 → 消费 eventfd → 执行 pendingFunctors
     wakeupFd_ = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
     if (wakeupFd_ < 0) {
-        std::cerr << "EventLoop: eventfd failed" << std::endl;
-        abort();
+        LOG_FATAL << "EventLoop: eventfd failed";
     }
 
     // 为 wakeupFd_ 创建 Channel，加入 epoll 监听
@@ -52,6 +57,11 @@ EventLoop::EventLoop()
 }
 
 EventLoop::~EventLoop() {
+    // 必须先析构 timerQueue_：它的 timerfdChannel 需要 epoll_ctl 从 epfd_ 摘除，
+    // 而成员逆序析构在函数体之后，那时 epfd_ 已被 close，会触发 EBADF。
+    // 这里显式 reset 保证 epfd_ 仍有效时完成清理。
+    timerQueue_.reset();
+
     wakeupChannel_->disableAll();
     removeChannel(wakeupChannel_.get());
     ::close(wakeupFd_);
@@ -73,7 +83,16 @@ void EventLoop::loop() {
         int nfds = epoll_wait(epfd_, events_.data(),
                               static_cast<int>(events_.size()), -1);
         if (nfds < 0) {
-            std::cerr << "EventLoop: epoll_wait failed" << std::endl;
+            if (errno == EINTR) {
+                // 被信号打断（如 SIGTERM 优雅退出）：信号处理器已置 quit_。
+                // 这里不能直接 continue 退出 —— 若 quit_ 已置位，while 条件会立即退出，
+                // 而 doPendingFunctors 还没执行，已投递的回调（如 Server 析构时 closeNow
+                // 调度的连接摘除）会被丢弃，导致连接在 loop 销毁后仍注册事件 → 析构崩溃。
+                // 因此 EINTR 时也要先执行一次 pending functors 再回到 while 检查退出。
+                doPendingFunctors();
+                continue;
+            }
+            LOG_ERROR << "EventLoop: epoll_wait failed, errno=" << errno;
             break;
         }
 
@@ -94,6 +113,13 @@ void EventLoop::loop() {
         // 4. 执行跨线程投递的待办回调
         doPendingFunctors();
     }
+
+    // 退出前最后一次清空 pending 队列：
+    // 竞态 —— 其它线程可能恰好在"最后一个 doPendingFunctors 已执行完、但 while 条件
+    // 即将判断 quit_ 退出"的间隙投递回调（如 Server 析构时 closeNow 调度的连接摘除）。
+    // 若直接返回，这些回调被丢弃，连接会在 loop 销毁后仍带事件注册 → 析构崩溃。
+    // 这里再清空一次，保证退出前所有已投递回调都已执行。
+    doPendingFunctors();
 }
 
 // ========== Channel 管理 ==========
@@ -113,22 +139,22 @@ void EventLoop::updateChannel(Channel* ch) {
     // 加入新的
     if (it == channels_.end()) {
         if (epoll_ctl(epfd_, EPOLL_CTL_ADD, fd, &ev) < 0) {
-            std::cerr << "EventLoop: epoll_ctl ADD failed fd=" << fd << std::endl;
+            LOG_ERROR << "EventLoop: epoll_ctl ADD failed fd=" << fd;
             return;
         }
         channels_[fd] = ch;
-    } 
+    }
     // 该fd没有关注的事件，通信已结束
     else if (ch->isNoneEvent()) {
         if (epoll_ctl(epfd_, EPOLL_CTL_DEL, fd, nullptr) < 0) {
-            std::cerr << "EventLoop: epoll_ctl DEL failed fd=" << fd << std::endl;
+            LOG_ERROR << "EventLoop: epoll_ctl DEL failed fd=" << fd;
         }
         channels_.erase(fd);
-    } 
+    }
     // 旧的fd更新关注事件
     else {
         if (epoll_ctl(epfd_, EPOLL_CTL_MOD, fd, &ev) < 0) {
-            std::cerr << "EventLoop: epoll_ctl MOD failed fd=" << fd << std::endl;
+            LOG_ERROR << "EventLoop: epoll_ctl MOD failed fd=" << fd;
         }
     }
 }

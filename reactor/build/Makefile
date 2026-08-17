@@ -179,6 +179,30 @@ Acceptor.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/reactor.dir/build.make CMakeFiles/reactor.dir/Acceptor.cpp.s
 .PHONY : Acceptor.cpp.s
 
+AsyncLogging.o: AsyncLogging.cpp.o
+.PHONY : AsyncLogging.o
+
+# target to build an object file
+AsyncLogging.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/reactor.dir/build.make CMakeFiles/reactor.dir/AsyncLogging.cpp.o
+.PHONY : AsyncLogging.cpp.o
+
+AsyncLogging.i: AsyncLogging.cpp.i
+.PHONY : AsyncLogging.i
+
+# target to preprocess a source file
+AsyncLogging.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/reactor.dir/build.make CMakeFiles/reactor.dir/AsyncLogging.cpp.i
+.PHONY : AsyncLogging.cpp.i
+
+AsyncLogging.s: AsyncLogging.cpp.s
+.PHONY : AsyncLogging.s
+
+# target to generate assembly for a file
+AsyncLogging.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/reactor.dir/build.make CMakeFiles/reactor.dir/AsyncLogging.cpp.s
+.PHONY : AsyncLogging.cpp.s
+
 Buffer.o: Buffer.cpp.o
 .PHONY : Buffer.o
 
@@ -298,6 +322,54 @@ EventLoopThreadPool.s: EventLoopThreadPool.cpp.s
 EventLoopThreadPool.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/reactor.dir/build.make CMakeFiles/reactor.dir/EventLoopThreadPool.cpp.s
 .PHONY : EventLoopThreadPool.cpp.s
+
+LogStream.o: LogStream.cpp.o
+.PHONY : LogStream.o
+
+# target to build an object file
+LogStream.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/reactor.dir/build.make CMakeFiles/reactor.dir/LogStream.cpp.o
+.PHONY : LogStream.cpp.o
+
+LogStream.i: LogStream.cpp.i
+.PHONY : LogStream.i
+
+# target to preprocess a source file
+LogStream.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/reactor.dir/build.make CMakeFiles/reactor.dir/LogStream.cpp.i
+.PHONY : LogStream.cpp.i
+
+LogStream.s: LogStream.cpp.s
+.PHONY : LogStream.s
+
+# target to generate assembly for a file
+LogStream.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/reactor.dir/build.make CMakeFiles/reactor.dir/LogStream.cpp.s
+.PHONY : LogStream.cpp.s
+
+Logger.o: Logger.cpp.o
+.PHONY : Logger.o
+
+# target to build an object file
+Logger.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/reactor.dir/build.make CMakeFiles/reactor.dir/Logger.cpp.o
+.PHONY : Logger.cpp.o
+
+Logger.i: Logger.cpp.i
+.PHONY : Logger.i
+
+# target to preprocess a source file
+Logger.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/reactor.dir/build.make CMakeFiles/reactor.dir/Logger.cpp.i
+.PHONY : Logger.cpp.i
+
+Logger.s: Logger.cpp.s
+.PHONY : Logger.s
+
+# target to generate assembly for a file
+Logger.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/reactor.dir/build.make CMakeFiles/reactor.dir/Logger.cpp.s
+.PHONY : Logger.cpp.s
 
 Server.o: Server.cpp.o
 .PHONY : Server.o
@@ -457,6 +529,9 @@ help:
 	@echo "... Acceptor.o"
 	@echo "... Acceptor.i"
 	@echo "... Acceptor.s"
+	@echo "... AsyncLogging.o"
+	@echo "... AsyncLogging.i"
+	@echo "... AsyncLogging.s"
 	@echo "... Buffer.o"
 	@echo "... Buffer.i"
 	@echo "... Buffer.s"
@@ -472,6 +547,12 @@ help:
 	@echo "... EventLoopThreadPool.o"
 	@echo "... EventLoopThreadPool.i"
 	@echo "... EventLoopThreadPool.s"
+	@echo "... LogStream.o"
+	@echo "... LogStream.i"
+	@echo "... LogStream.s"
+	@echo "... Logger.o"
+	@echo "... Logger.i"
+	@echo "... Logger.s"
 	@echo "... Server.o"
 	@echo "... Server.i"
 	@echo "... Server.s"

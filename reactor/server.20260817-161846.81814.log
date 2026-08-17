@@ -1,0 +1,8 @@
+2026-08-17 16:18:46.566439 81814 INFO  server.cpp:77 - [logging] async logging started (server.*.log)
+2026-08-17 16:18:46.566456 81814 INFO  server.cpp:111 - === Multi-Reactor Chat Server ===
+2026-08-17 16:18:46.566458 81814 INFO  server.cpp:112 - Port: 8170, IO threads: 2 (sub-reactors)
+2026-08-17 16:18:46.566704 81816 INFO  EventLoopThreadPool.cpp:43 - [thread] reactor-io-0 started
+2026-08-17 16:18:46.566957 81817 INFO  EventLoopThreadPool.cpp:43 - [thread] reactor-io-1 started
+2026-08-17 16:18:46.567037 81814 INFO  Server.cpp:78 - [Server] heartbeat enabled (timeout=5000ms, interval=1000ms)
+2026-08-17 16:18:46.567045 81814 INFO  Server.cpp:83 - [Server] started  (1 main reactor + 2 sub-reactor(s))
+2026-08-17 16:18:46.685886 81814 INFO  server.cpp:172 - [server] event loop quit, shutting down...
